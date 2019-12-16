@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Fun with Petri Nets</title>
+        <style>
+          input, label {
+              display: block;
+          }
+        </style>
+    </head>
+    <body>
+        <canvas width="600" height="500" id="canvas"></canvas>
+        <script src="/petrinets.js"></script>
+        <div id="control_mount" class="petricontrols" data-petricontrols='{
+          "canvas_id": "canvas",
+          "petri_data": [
+              [[1],[0]]
+          ],
+          "species": ["population"],
+          "transitions": ["death"],
+          "init_vals0": [4],
+          "rates0": [1.0]
+        }'> </div>
+    </body>
+</html>
