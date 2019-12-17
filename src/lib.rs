@@ -1,5 +1,6 @@
 #![recursion_limit = "512"]
-mod app;
+mod math;
+mod graph;
 mod utils;
 
 use wasm_bindgen::prelude::*;
@@ -16,12 +17,11 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 // This is the entry point for the web app
 #[wasm_bindgen]
 pub fn run_app(mount_id: &str, js_props: &str) -> Result<(), JsValue> {
-    let props: app::Props = serde_json::from_str(js_props).unwrap();
-    // console!(log, "deserialized");
+    let props: graph::Props = serde_json::from_str(js_props)
+        .map_err(|e| JsValue::from_str(&format!("json parse error: {}",e)))?;
     utils::set_panic_hook();
     let document = document();
     let control_mount = document.query_selector(&format!("#{}",&mount_id)).unwrap().unwrap();
-    // console!(log, "mount point aquired");
-    App::<app::App>::new().mount_with_props(control_mount,props);
+    App::<graph::App>::new().mount_with_props(control_mount,props);
     Ok(())
 }
