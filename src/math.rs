@@ -23,10 +23,7 @@ pub fn rk_solve(f: impl Fn(f32, &V) -> V, t0: f32, t1: f32, steps: usize, y0: &V
     yvals
 }
 
-/// Axis(0) is transitions
-/// Axis(1) is input vs. output
-/// Axis(2) is numbers of inputs and outputs
-pub struct PetriData(Array<i32, Ix3>);
+pub struct PetriData(pub Array<i32, Ix3>);
 
 impl PetriData {
     fn data(&self) -> &Array<i32, Ix3> {
@@ -35,18 +32,11 @@ impl PetriData {
         }
     }
 
-    pub fn from_nested_vec(v: Vec<Vec<Vec<i32>>>) -> Option<Self> {
-        let (t, s) = (v.len(), v[0][0].len());
-        Array::from_shape_vec((t, 2, s), (&v.concat()).concat())
-            .ok()
-            .map(|a| PetriData(a))
-    }
-
-    pub fn num_species(&self) -> usize {
+    fn num_species(&self) -> usize {
         self.data().len_of(Axis(2))
     }
 
-    pub fn master_eq(&self, rates: &V, y: &V) -> V {
+    fn master_eq(&self, rates: &V, y: &V) -> V {
         let d = self.data();
         let mut yp = Array::zeros(y.dim());
         let n = self.num_species();

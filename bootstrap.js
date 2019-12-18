@@ -3,8 +3,8 @@ import("./pkg").then(module => {
     for (i = 0; i < petriControlElements.length; i++) {
         let e = petriControlElements[i];
         try {
-            let settings = e.dataset.petricontrols;
-            module.run_app(e.id, settings);
+            // let settings = e.dataset.petricontrols;
+            module.run_app(e.id, "canvas");
         } catch (error) {
             console.error(error);
         }
