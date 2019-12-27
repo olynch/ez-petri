@@ -8,8 +8,6 @@ mod utils;
 use wasm_bindgen::prelude::*;
 use stdweb::web::{document, IParentNode};
 use yew::app::App;
-use stdweb::console;
-use crate::plot::*;
 use crate::editor::*;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global

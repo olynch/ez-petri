@@ -1,7 +1,7 @@
 use yew::prelude::*;
 use ndarray::prelude::*;
-use crate::math::*;
 use crate::petri::*;
+use plotters::style::Color;
 
 trait Edit {
     type Val;
@@ -9,6 +9,7 @@ trait Edit {
     fn apply_edit(self, v: &mut Self::Val);
 }
 
+#[derive(Debug)]
 pub enum PlainEdit<T> {
     PlainEdit(T)
 }
@@ -22,6 +23,7 @@ impl<T> Edit for PlainEdit<T> {
     }
 }
 
+#[derive(Debug)]
 pub enum VecEdit<S> {
     Remove(usize),
     Edit(usize,S)
@@ -38,6 +40,7 @@ impl<T,S> Edit for VecEdit<S> where S: Edit<Val=T> {
 }
 
 // VecEditDefault
+#[derive(Debug)]
 pub enum VED<S> {
     Add,
     Edit(VecEdit<S>)
@@ -57,6 +60,7 @@ impl<S> VED<S> {
     }
 }
 
+#[derive(Debug)]
 pub enum TransitionEdit {
     NameEdit(String),
     IOEdit(IO,usize,i32),
@@ -72,6 +76,7 @@ impl Edit for TransitionEdit {
     }
 }
 
+#[derive(Debug)]
 pub enum PetriEdit {
     TransitionsEdit(VED<TransitionEdit>),
     SpeciesEdit(VED<PlainEdit<String>>),
@@ -126,6 +131,7 @@ impl Edit for PetriEdit {
     }
 }
 
+#[derive(Debug)]
 pub enum ControlsEdit {
     RatesEdit(VED<PlainEdit<f32>>),
     InitValsEdit(VED<PlainEdit<f32>>)
@@ -182,9 +188,12 @@ impl Edit for ControlsEdit {
     }
 }
 
+#[derive(Debug)]
 pub enum Msg {
     ForPetri(PetriEdit),
-    ForControls(ControlsEdit)
+    ForControls(ControlsEdit),
+    Draw,
+    LiveUpdating,
 }
 
 impl Msg {
@@ -212,91 +221,133 @@ impl Msg {
 pub struct Editor {
     petri_net: PetriNet,
     controls: PlotControls,
-    canvas_id: String
+    canvas_id: String,
+    live_updating: bool,
+}
+
+fn color_style<T: Color>(c: T) -> String {
+    let (r,g,b) = c.rgb();
+    format!("background-color:rgba({},{},{},0.2)", r, g, b)
 }
 
 impl Editor {
-    fn view_transitions(&self) -> Html<Self> {
+    fn view_matrix(&self) -> Html<Self> {
         html!{
             <div>
-                <button onclick=|_| Msg::transitions_edit(VED::Add)>{"Add Transition"}</button>
-                <ul>
+            <label>{"Transition Matrix:"}</label>
+            <table style="border:1px solid black">
+                <tr>
+                    <th style="width:135px" rowspan="2"> </th>
+                    { for self.petri_net.species.iter().enumerate().map(|(i,s)| {
+                        html!{
+                            <th class="species-header" colspan="2">
+                                <input type="text" style={color_style(get_color(i))} class="table-form matrix-input" value={&s} oninput=|v|
+                                    Msg::species_edit(VED::edit(i,PlainEdit::PlainEdit(v.value)))>
+                                </input>
+                                <button class="square-button" onclick=|_| Msg::species_edit(VED::remove(i))>{"-"}</button>
+                            </th>
+                        }
+                    })}
+                    <th> <button class="square-button" onclick=|_| Msg::species_edit(VED::add())>{"+"}</button> </th>
+                </tr>
+                <tr>
+                    { for self.petri_net.species.iter().enumerate().map(|(i,s)| {
+                        html!{
+                            <>
+                            <td class="transition-direction">{"In"}</td>
+                            <td class="transition-direction">{"Out"}</td>
+                            </>
+                        }
+                    })}
+                    <td> </td>
+                </tr>
                 { for self.petri_net.transitions.iter().enumerate().map(|(i,t)| {
                 html!{
-                    <li>
-                        <input type="text" value={&t.name} oninput=|v|
+                    <tr>
+                    <td>
+                        <input class="matrix-input" type="text" value={&t.name} oninput=|v|
                             Msg::transitions_edit(VED::edit(i,TransitionEdit::NameEdit(v.value)))>
                         </input>
-                        <input
-                            value={self.controls.rates[i]}
-                            type="range"
-                            min="0"
-                            max={self.controls.scale}
-                            step="0.01"
-                            class="slider"
-                            oninput=|v| { Msg::rates_edit(i,v.value.parse().unwrap()) }>
-                        </input>
-                        <button onclick=|_| Msg::transitions_edit(VED::remove(i))>{"Remove"}</button>
-                        <ul>
-                        { for DIRECTIONS.iter().map(|d| {
-                            html!{
-                                <li>{&format!("{}: ",d)}
-                                    <ul>
-                                    { for (&t[*d]).iter().enumerate().map(|(j,x)| {
-                                        html!{
-                                            <li>
-                                            {&format!("{}: ", &self.petri_net.species[j])}
-
-                                            <input type="number" value={x.to_string()} oninput=|xp| {
-                                                Msg::transitions_edit(
-                                                    VED::edit(
-                                                        i,TransitionEdit::IOEdit(*d,j,xp.value.parse().unwrap())
-                                                    )
-                                                )
-                                            }>
-                                            </input>
-                                            </li>
-                                        }
-                                    })}
-                                    </ul>
-                                </li>
-                            }
-                        })}
-                        </ul>
-                    </li>
+                        <button class="square-button" onclick=|_| Msg::transitions_edit(VED::remove(i))>{"-"}</button>
+                    </td>
+                    { for (0..self.petri_net.species.len()).map(|j| {
+                        html!{
+                            { for DIRECTIONS.iter().map(|d| {
+                                html!{
+                                    <td>
+                                    <input class="transitions-counter" type="number" value={t[*d][j].to_string()} oninput=|xp| {
+                                        Msg::transitions_edit(
+                                            VED::edit(
+                                                i,TransitionEdit::IOEdit(*d,j,xp.value.parse().unwrap())
+                                            )
+                                        )
+                                    }> </input>
+                                    </td>
+                                }
+                            })}
+                        }
+                    })}
+                    <td> </td>
+                    </tr>
                 }
                 })}
-                </ul>
+                <tr>
+                    <td> <button class="square-button" onclick=|_| Msg::transitions_edit(VED::add())>{"+"}</button> </td>
+                    { for (0..self.petri_net.species.len()+1).map(|_| { html!{ <> <td></td> <td></td> </> } } )}
+                </tr>
+            </table>
             </div>
         }
     }
 
-    fn view_species(&self) -> Html<Self> {
+    fn view_controls(&self) -> Html<Self> {
         html!{
-            <div>
-                <button onclick=|_| Msg::species_edit(VED::Add)>{"Add Species"}</button>
-                <ul>
-                { for self.petri_net.species.iter().enumerate().map(|(i,s)| {
-                    html!{
-                        <li>
-                          <input type="text" value={&s} oninput=|v|
-                            Msg::species_edit(VED::edit(i,PlainEdit::PlainEdit(v.value)))>
-                            </input>
-                            <input
-                                value={self.controls.init_vals[i]}
-                                type="range"
-                                min="0"
-                                max={self.controls.scale}
-                                step="0.01"
-                                class="slider"
-                                oninput=|v| { Msg::init_vals_edit(i,v.value.parse().unwrap()) }>
-                            </input>
-                            <button onclick=|_| Msg::species_edit(VED::remove(i))>{"Remove"}</button>
-                        </li>
-                    }
-                })}
-                </ul>
-            </div>
+            <>
+            <label class="name-label" for="name-input">{ "Name: " }</label>
+            <input id="name-input" type="text" value={&self.petri_net.name} oninput=|v| Msg::name_edit(v.value)>
+            </input>
+            <hr />
+            <label>{"Initial Value Controls:"}</label>
+
+            <table>
+                <tr>
+                <th class="control-cell"><div class="control-label">{"Species"}</div></th>
+                <th class="control-cell"><div class="control-label">{"Initial Value"}</div></th>
+                </tr>
+            { for self.petri_net.species.iter().enumerate().map(|(i,s)| {
+                html!{
+                    <tr class="control-row" style={color_style(get_color(i))}>
+                        <td class="control-cell"><div class="control-label">{&s}</div></td>
+                        <td class="control-cell">
+                        <input class="table-form control-slider" value={self.controls.init_vals[i]} type="range" min="0" max={self.controls.scale} step="0.01"
+                        oninput=|v| { Msg::init_vals_edit(i,v.value.parse().unwrap()) }></input>
+                        </td>
+                    </tr>
+                }
+            })}
+            </table>
+
+            <hr />
+            <label>{"Rate Controls:"}</label>
+
+            <table>
+                <tr>
+                <th class="control-cell"><div class="control-label">{"Transition"}</div></th>
+                <th class="control-cell"><div class="control-label">{"Rate"}</div></th>
+                </tr>
+            { for self.petri_net.transitions.iter().enumerate().map(|(i,t)| {
+                html!{
+                    <tr class="control-row">
+                        <td class="control-cell"><div class="control-label">{&t.name}</div></td>
+                        <td class="control-cell">
+                        <input class="table-form control-slider" value={self.controls.rates[i]} type="range" min="0" max={self.controls.scale} step="0.01"
+                        oninput=|v| { Msg::rates_edit(i,v.value.parse().unwrap()) }></input>
+                        </td>
+                    </tr>
+                }
+            })}
+            </table>
+            </>
         }
     }
 }
@@ -316,7 +367,8 @@ impl Component for Editor {
         Editor {
             petri_net: PetriNet::empty(),
             controls: PlotControls::empty(),
-            canvas_id: p.canvas_id
+            canvas_id: p.canvas_id,
+            live_updating: false,
         }
     }
 
@@ -329,22 +381,58 @@ impl Component for Editor {
             Msg::ForControls(e) => {
                 e.apply_edit(&mut self.controls);
             }
+            Msg::Draw => {
+                self.petri_net.plot(&self.controls, &self.canvas_id).ok().unwrap();
+            }
+            Msg::LiveUpdating => {
+                self.live_updating ^= true;
+            }
         }
         true
     }
 
     fn view(&self) -> Html<Self> {
-        self.petri_net.plot(&self.controls, &self.canvas_id);
+        if self.live_updating {
+            self.petri_net.plot(&self.controls, &self.canvas_id).ok().unwrap();
+        }
         html!{
-            <div>
-                <label for="name_input">{ "Name: " }</label>
-                <input id="name_input" type="text" value={&self.petri_net.name} oninput=|v| Msg::name_edit(v.value)>
-                </input>
-                <h3>{"Species"}</h3>
-                { self.view_species() }
-                <h3>{"Transitions"}</h3>
-                { self.view_transitions() }
+            <>
+            <div class="navbar column">
+                <span>{"EZ Petri"}</span>
+                <span class="menu-action">{"Help"}</span>
+                <span class="menu-action">{"Toggle Source"}</span>
             </div>
+            <div class="row" style="margin-top:50px">
+                <div class="column one-third">
+                    { self.view_controls() }
+                </div>
+                <div class="column two-thirds">
+                  <canvas class="plot" width="500px" height="400px" id={&self.canvas_id}></canvas>
+                  <button style="width:200px;margin-right:30px" onclick=|_| Msg::LiveUpdating>{
+                      if self.live_updating {
+                          "Live Updating"
+                      } else {
+                          "Manually Updating"
+                      }
+                  }
+                  </button>
+                  { if !self.live_updating {
+                      html!{
+                          <button style="width:100px;margin-right:30px" onclick=|_| Msg::Draw>{"Refresh"}</button>
+                      }
+                    } else { html!{<></>} }
+                  }
+                </div>
+            </div>
+            <div class="row">
+                <hr />
+            </div>
+            <div class="row">
+                <div class="column">
+                    { self.view_matrix() }
+                </div>
+            </div>
+            </>
         }
     }
 }

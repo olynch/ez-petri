@@ -2,28 +2,26 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
-        <title>Fun with Petri Nets</title>
-        <style>
-          input, label {
-              display: block;
-          }
-        </style>
+        <title>EZ Petri</title>
+        <link rel="stylesheet" type="text/css" href="skeleton.css">
     </head>
     <body>
-        <canvas width="600" height="500" id="canvas"></canvas>
-        <script src="/petrinets.js"></script>
+      <div class="container">
         <div id="control_mount" class="petricontrols" data-petricontrols='{
-          "name": "Exponential Decay Model",
-          "canvas_id": "canvas",
-          "petri_data": [
-              [[1],[0]]
-          ],
-          "species": ["population"],
-          "transitions": ["death"],
-          "init_vals0": [4],
-          "rates0": [1.0],
-          "xmax": 10.0,
-          "ymax": 5.0
-        }'> </div>
+                                                                          "name": "Exponential Decay Model",
+                                                                          "canvas_id": "canvas",
+                                                                          "petri_data": [
+                                                                          [[1],[0]]
+                                                                          ],
+                                                                          "species": ["population"],
+                                                                          "transitions": ["death"],
+                                                                          "init_vals0": [4],
+                                                                          "rates0": [1.0],
+                                                                          "xmax": 10.0,
+                                                                          "ymax": 5.0
+                                                                          }'>
+        </div>
+      </div>
+      <script src="/petrinets.js"></script>
     </body>
 </html>

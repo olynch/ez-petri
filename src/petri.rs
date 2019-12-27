@@ -5,7 +5,6 @@ use std::fmt;
 use plotters::prelude::*;
 use crate::math::*;
 
-
 #[derive(Serialize, Deserialize)]
 pub struct Transition {
     pub name: String,
@@ -13,7 +12,7 @@ pub struct Transition {
     pub output: Vec<i32>
 }
 
-#[derive(Copy,Clone)]
+#[derive(Copy,Clone,Debug)]
 pub enum IO {
     Input,
     Output
@@ -59,7 +58,7 @@ impl IndexMut<IO> for Transition {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PlotControls {
     pub init_vals: Vec<f32>,
     pub rates: Vec<f32>,
@@ -89,12 +88,9 @@ pub struct PetriNet {
 
 static STEPS_PER_UNIT: usize = 100;
 
-static COLORS: [RGBColor; 4] = [RED, BLUE, YELLOW, GREEN];
-
-fn get_color(i: usize) -> &'static RGBColor {
-    &COLORS[i]
+pub fn get_color(i: usize) -> PaletteColor<Palette99> {
+    PaletteColor::<Palette99>::pick(i)
 }
-
 
 impl PetriNet {
     pub fn empty() -> Self {
@@ -156,10 +152,10 @@ impl PetriNet {
                             *yvals.get((x, i)).unwrap() as f32,
                         )
                     }),
-                    c,
+                    &c,
                 ))?
                 .label(s)
-                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], c));
+                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &c));
         }
 
         chart
