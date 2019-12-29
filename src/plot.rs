@@ -2,85 +2,84 @@ use serde::{Deserialize, Serialize};
 use yew::prelude::*;
 use crate::petri::*;
 
-pub struct Plotter {
-    controls: PlotControls,
-    petri_net: PetriNet,
-    canvas_id: String,
-}
-
-impl Plotter {
-    fn plot(&self) -> Option<()> {
-        self.petri_net.plot(&self.controls, &self.canvas_id).ok()
-    }
-}
-
-pub enum PlotMsg {
-    RateUpdate(usize, f32),
-    InitValueUpdate(usize, f32),
-}
-
 #[derive(Serialize, Deserialize, Properties)]
 pub struct PlotProps {
     #[props(required)]
-    pub petri_net: PetriNet,
+    pub petri: PetriNet,
 
     #[props(required)]
     pub controls: PlotControls,
-
-    #[props(required)]
-    pub canvas_id: String,
 }
 
-impl Component for Plotter {
+pub struct Plot {
+    props: PlotProps,
+    live_updating: bool,
+    mounted: bool
+}
+
+pub enum PlotMsg {
+    Draw,
+    LiveUpdating
+}
+
+const CANVAS_ID: &'static str = "CANVAS_ID";
+
+impl Component for Plot {
     type Message = PlotMsg;
     type Properties = PlotProps;
 
     fn create(p: Self::Properties, _: ComponentLink<Self>) -> Self {
-        Plotter {
-            petri_net: p.petri_net,
-            controls: p.controls,
-            canvas_id: p.canvas_id,
+        Plot {
+            props: p,
+            live_updating: false,
+            mounted: false
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            PlotMsg::InitValueUpdate(i, x) => {
-                self.controls.init_vals[i] = x;
+            PlotMsg::Draw => {
+                self.props.petri.plot(&self.props.controls, CANVAS_ID).ok().unwrap();
+                false
             }
-            PlotMsg::RateUpdate(i, x) => {
-                self.controls.rates[i] = x;
+            PlotMsg::LiveUpdating => {
+                self.live_updating ^= true;
+                true
             }
         }
-        true
     }
 
     fn view(&self) -> Html<Self> {
-        self.plot().unwrap();
+        if self.mounted && self.live_updating {
+            self.props.petri.plot(&self.props.controls, CANVAS_ID).ok().unwrap();
+        }
         html! {
-            <div>
-            { for self.petri_net.species.iter().enumerate().map(|(i,s)| {
-                let v = self.controls.init_vals[i];
-                view_slider(Box::new(move |x| PlotMsg::InitValueUpdate(i,x)), v, &format!("init value for {}: {}", s, v))
-            })
-            }
-            { for self.petri_net.transitions.iter().enumerate().map(|(i,t)| {
-                let r = self.controls.rates[i];
-                view_slider(Box::new(move |x| PlotMsg::RateUpdate(i,x)), r, &format!("rate of {}: {}", &t.name, &r))
-            })
-            }
-            </div>
+            <>
+                <canvas height="400px" width="500px" class="plot" id={CANVAS_ID}> </canvas>
+            { if self.live_updating {
+                html!{
+                    <button style="width:200px;margin-right:30px" onclick=|_| PlotMsg::LiveUpdating>{"Live Updating"}</button>
+                }
+            } else {
+                html!{
+                    <>
+                    <button style="width:200px;margin-right:30px" onclick=|_| PlotMsg::LiveUpdating>{"Manual Updating"}</button>
+                    <button style="width:100px;margin-right:30px" onclick=|_| PlotMsg::Draw>{"Refresh"}</button>
+                    </>
+                }
+            }}
+            </>
         }
     }
-}
 
-fn view_slider(msg_generator: Box<dyn Fn(f32) -> PlotMsg>, init_val: f32, label: &str) -> Html<Plotter> {
-    html! {
-        <p>
-            <label for=label> { label } </label>
-            <input value={init_val} type="range" min="0" max="10" step="0.01" class="slider" id=label oninput=|inputdata| {
-                msg_generator(inputdata.value.parse().unwrap())
-            }></input>
-            </p>
+    fn change(&mut self, p: Self::Properties) -> ShouldRender {
+        self.props = p;
+        true
+    }
+
+    fn mounted(&mut self) -> ShouldRender {
+        self.mounted = true;
+        self.props.petri.plot(&self.props.controls, CANVAS_ID).ok().unwrap();
+        false
     }
 }

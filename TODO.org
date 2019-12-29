@@ -1,0 +1,17 @@
+* Appearance
+** TODO color code species
+** TODO color code transitions
+** TODO fix margins on controls
+** TODO theme controls
+** TODO resize canvas based on size of display
+** TODO fix name input
+* Performance
+** TODO figure out when the graph should refresh
+Background thread?
+* Refactoring
+** TODO refactor CSS into coherent classes
+* Features
+** TODO display petri net
+** TODO set xmax and ymax
+** TODO set characteristic scale
+** TODO import/export

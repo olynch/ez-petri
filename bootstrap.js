@@ -4,7 +4,7 @@ import("./pkg").then(module => {
         let e = petriControlElements[i];
         try {
             // let settings = e.dataset.petricontrols;
-            module.run_app(e.id, "canvas");
+            module.run_app(e.id);
         } catch (error) {
             console.error(error);
         }

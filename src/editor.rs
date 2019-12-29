@@ -1,7 +1,9 @@
 use yew::prelude::*;
 use ndarray::prelude::*;
-use crate::petri::*;
 use plotters::style::Color;
+use serde::{Serialize, Deserialize};
+use crate::plot::*;
+use crate::petri::*;
 
 trait Edit {
     type Val;
@@ -192,8 +194,8 @@ impl Edit for ControlsEdit {
 pub enum Msg {
     ForPetri(PetriEdit),
     ForControls(ControlsEdit),
-    Draw,
-    LiveUpdating,
+    ViewSwitch,
+    SourceUpdate(String),
 }
 
 impl Msg {
@@ -218,11 +220,23 @@ impl Msg {
     }
 }
 
-pub struct Editor {
+#[derive(Serialize, Deserialize)]
+pub struct GE {
     petri_net: PetriNet,
     controls: PlotControls,
-    canvas_id: String,
-    live_updating: bool,
+}
+
+pub struct SE {
+    code: String
+}
+
+pub enum EditorState {
+    Graphical (GE),
+    Source (SE),
+}
+
+pub struct Editor {
+    state: EditorState
 }
 
 fn color_style<T: Color>(c: T) -> String {
@@ -230,10 +244,16 @@ fn color_style<T: Color>(c: T) -> String {
     format!("background-color:rgba({},{},{},0.2)", r, g, b)
 }
 
-impl Editor {
-    fn view_matrix(&self) -> Html<Self> {
+impl GE {
+    fn to_se(&self) -> SE {
+        SE {
+            code: serde_json::to_string(&self).unwrap()
+        }
+    }
+    
+    fn view_matrix(&self) -> Html<Editor> {
         html!{
-            <div>
+            <div class="matrix">
             <label>{"Transition Matrix:"}</label>
             <table style="border:1px solid black">
                 <tr>
@@ -264,7 +284,7 @@ impl Editor {
                 { for self.petri_net.transitions.iter().enumerate().map(|(i,t)| {
                 html!{
                     <tr>
-                    <td>
+                    <td class="transition-header">
                         <input class="matrix-input" type="text" value={&t.name} oninput=|v|
                             Msg::transitions_edit(VED::edit(i,TransitionEdit::NameEdit(v.value)))>
                         </input>
@@ -300,9 +320,9 @@ impl Editor {
         }
     }
 
-    fn view_controls(&self) -> Html<Self> {
+    fn view_controls(&self) -> Html<Editor> {
         html!{
-            <>
+            <div class="controls">
             <label class="name-label" for="name-input">{ "Name: " }</label>
             <input id="name-input" type="text" value={&self.petri_net.name} oninput=|v| Msg::name_edit(v.value)>
             </input>
@@ -347,81 +367,20 @@ impl Editor {
                 }
             })}
             </table>
-            </>
-        }
-    }
-}
-
-// Communication between editor and plotter
-
-#[derive(Properties)]
-pub struct EditorProps {
-    pub canvas_id: String
-}
-
-impl Component for Editor {
-    type Message = Msg;
-    type Properties = EditorProps;
-
-    fn create(p: Self::Properties, _: ComponentLink<Self>) -> Self {
-        Editor {
-            petri_net: PetriNet::empty(),
-            controls: PlotControls::empty(),
-            canvas_id: p.canvas_id,
-            live_updating: false,
+            </div>
         }
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
-        match msg {
-            Msg::ForPetri(e) => {
-                ControlsEdit::from_petri_edit(&e).map(|ce| ce.apply_edit(&mut self.controls));
-                e.apply_edit(&mut self.petri_net);
-            }
-            Msg::ForControls(e) => {
-                e.apply_edit(&mut self.controls);
-            }
-            Msg::Draw => {
-                self.petri_net.plot(&self.controls, &self.canvas_id).ok().unwrap();
-            }
-            Msg::LiveUpdating => {
-                self.live_updating ^= true;
-            }
-        }
-        true
-    }
 
-    fn view(&self) -> Html<Self> {
-        if self.live_updating {
-            self.petri_net.plot(&self.controls, &self.canvas_id).ok().unwrap();
-        }
+    fn view(&self) -> Html<Editor> {
         html!{
             <>
-            <div class="navbar column">
-                <span>{"EZ Petri"}</span>
-                <span class="menu-action">{"Help"}</span>
-                <span class="menu-action">{"Toggle Source"}</span>
-            </div>
             <div class="row" style="margin-top:50px">
                 <div class="column one-third">
                     { self.view_controls() }
                 </div>
                 <div class="column two-thirds">
-                  <canvas class="plot" width="500px" height="400px" id={&self.canvas_id}></canvas>
-                  <button style="width:200px;margin-right:30px" onclick=|_| Msg::LiveUpdating>{
-                      if self.live_updating {
-                          "Live Updating"
-                      } else {
-                          "Manually Updating"
-                      }
-                  }
-                  </button>
-                  { if !self.live_updating {
-                      html!{
-                          <button style="width:100px;margin-right:30px" onclick=|_| Msg::Draw>{"Refresh"}</button>
-                      }
-                    } else { html!{<></>} }
-                  }
+                  <Plot petri=self.petri_net.clone() controls=self.controls.clone() />
                 </div>
             </div>
             <div class="row">
@@ -432,6 +391,91 @@ impl Component for Editor {
                     { self.view_matrix() }
                 </div>
             </div>
+            </>
+        }
+    }
+}
+
+impl SE {
+    fn to_ge(&self) -> Option<GE> {
+        serde_json::from_str(&self.code).ok()
+    }
+
+    fn view(&self) -> Html<Editor> {
+        html!{
+            <div class="row" style="margin-top:50px">
+                <textarea class="sourceview" oninput=|e| {Msg::SourceUpdate(e.value)}>
+                    {&self.code}
+                </textarea>
+            </div>
+        }
+    }
+}
+
+// Communication between editor and plotter
+
+#[derive(Properties)]
+pub struct EditorProps {
+}
+
+impl Component for Editor {
+    type Message = Msg;
+    type Properties = EditorProps;
+
+    fn create(_p: Self::Properties, _link: ComponentLink<Self>) -> Self {
+        Editor {
+            state: EditorState::Graphical(GE {
+                petri_net: PetriNet::empty(),
+                controls: PlotControls::empty(),
+            })
+        }
+    }
+
+    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+        match &mut self.state {
+            EditorState::Graphical(ge) => match msg {
+                Msg::ForPetri(e) => {
+                    ControlsEdit::from_petri_edit(&e).map(|ce| ce.apply_edit(&mut ge.controls));
+                    e.apply_edit(&mut ge.petri_net);
+                }
+                Msg::ForControls(e) => {
+                    e.apply_edit(&mut ge.controls);
+                }
+                Msg::ViewSwitch => {
+                    self.state = EditorState::Source(ge.to_se())
+                }
+                _otherwise => { }
+            },
+            EditorState::Source(se) => match msg {
+                Msg::SourceUpdate(c) => {
+                    se.code = c;
+                }
+                Msg::ViewSwitch => {
+                    match se.to_ge() {
+                        Some(ge) => {
+                            self.state = EditorState::Graphical(ge);
+                        }
+                        None => { }
+                    }
+                }
+                _otherwise => { }
+            }
+        }
+        true
+    }
+
+    fn view(&self) -> Html<Self> {
+        html!{
+            <>
+                <div class="navbar column">
+                    <span>{"EZ Petri"}</span>
+                    <span class="menu-action"><a href="https://owenlynch.org/posts/2019-12-28-ez-petri">{"Help"}</a></span>
+                    <span class="menu-action" onclick=|_| Msg::ViewSwitch>{"Toggle Source"}</span>
+                </div>
+            { match &self.state {
+                EditorState::Graphical(ge) => ge.view(),
+                EditorState::Source(se) => se.view(),
+            }}
             </>
         }
     }

@@ -5,7 +5,7 @@ use std::fmt;
 use plotters::prelude::*;
 use crate::math::*;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Transition {
     pub name: String,
     pub input: Vec<i32>,
@@ -58,7 +58,7 @@ impl IndexMut<IO> for Transition {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PlotControls {
     pub init_vals: Vec<f32>,
     pub rates: Vec<f32>,
@@ -79,14 +79,14 @@ impl PlotControls {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PetriNet {
     pub name: String,
     pub transitions: Vec<Transition>,
     pub species: Vec<String>
 }
 
-static STEPS_PER_UNIT: usize = 100;
+static STEPS: usize = 500;
 
 pub fn get_color(i: usize) -> PaletteColor<Palette99> {
     PaletteColor::<Palette99>::pick(i)
@@ -117,13 +117,13 @@ impl PetriNet {
     
     pub fn plot(&self, controls: &PlotControls, canvas_id: &str)
             -> DrawResult<(),CanvasBackend> {
-        let steps = (STEPS_PER_UNIT as f32 * controls.xmax) as usize;
+        let steps_per_unit = STEPS as f32 / controls.xmax;
         let yvals = self
             .get_petri_data()
             .solve(&Array::from(controls.rates.clone()),
                    &Array::from(controls.init_vals.clone()),
                    controls.xmax,
-                   steps);
+                   STEPS);
 
         let backend = CanvasBackend::new(canvas_id).expect("cannot find canvas");
         let root = backend.into_drawing_area();
@@ -146,9 +146,9 @@ impl PetriNet {
             let c = get_color(i);
             chart
                 .draw_series(LineSeries::new(
-                    (0..steps).map(|x| {
+                    (0..STEPS).map(|x| {
                         (
-                            x as f32 / (STEPS_PER_UNIT as f32),
+                            x as f32 / steps_per_unit,
                             *yvals.get((x, i)).unwrap() as f32,
                         )
                     }),
