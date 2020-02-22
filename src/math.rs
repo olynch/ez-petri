@@ -26,13 +26,13 @@ pub fn rk_solve(f: impl Fn(f32, &V) -> V, t0: f32, t1: f32, steps: usize, y0: &V
 pub struct PetriData(pub Array<i32, Ix3>);
 
 impl PetriData {
-    fn data(&self) -> &Array<i32, Ix3> {
+    pub fn data(&self) -> &Array<i32, Ix3> {
         match self {
             PetriData(d) => d,
         }
     }
 
-    fn num_species(&self) -> usize {
+    pub fn num_species(&self) -> usize {
         self.data().len_of(Axis(2))
     }
 

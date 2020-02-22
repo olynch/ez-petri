@@ -114,7 +114,8 @@ impl PetriNet {
         }
         PetriData(pd)
     }
-    
+
+    #[cfg(target_arch = "wasm32")]
     pub fn plot(&self, controls: &PlotControls, canvas_id: &str)
             -> DrawResult<(),CanvasBackend> {
         let steps_per_unit = STEPS as f32 / controls.xmax;

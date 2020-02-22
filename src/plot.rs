@@ -24,6 +24,7 @@ pub enum PlotMsg {
 
 const CANVAS_ID: &'static str = "CANVAS_ID";
 
+#[cfg(target_arch = "wasm32")]
 impl Component for Plot {
     type Message = PlotMsg;
     type Properties = PlotProps;

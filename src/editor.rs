@@ -196,6 +196,7 @@ pub enum Msg {
     ForControls(ControlsEdit),
     ViewSwitch,
     SourceUpdate(String),
+    SaveInUrl,
 }
 
 impl Msg {
@@ -224,6 +225,15 @@ impl Msg {
 pub struct GE {
     petri_net: PetriNet,
     controls: PlotControls,
+}
+
+impl Default for GE {
+    fn default() -> Self {
+        GE {
+            petri_net: PetriNet::empty(),
+            controls: PlotControls::empty()
+        }
+    }
 }
 
 pub struct SE {
@@ -371,7 +381,6 @@ impl GE {
         }
     }
 
-
     fn view(&self) -> Html<Editor> {
         html!{
             <>
@@ -393,6 +402,16 @@ impl GE {
             </div>
             </>
         }
+    }
+
+    pub fn to_url_hash(&self) -> String {
+        let mp = rmp_serde::to_vec(self).unwrap();
+        base64::encode_config(&mp, base64::URL_SAFE)
+    }
+
+    pub fn from_url_hash(h: &str) -> Option<Self> {
+        base64::decode_config(h, base64::URL_SAFE).ok()
+            .and_then(|d| rmp_serde::from_read::<&[u8],GE>(&d).ok())
     }
 }
 
@@ -416,21 +435,22 @@ impl SE {
 
 #[derive(Properties)]
 pub struct EditorProps {
+    #[props(required)]
+    pub initial_state: GE
 }
 
 impl Component for Editor {
     type Message = Msg;
     type Properties = EditorProps;
 
-    fn create(_p: Self::Properties, _link: ComponentLink<Self>) -> Self {
+    fn create(p: Self::Properties, _link: ComponentLink<Self>) -> Self {
         Editor {
-            state: EditorState::Graphical(GE {
-                petri_net: PetriNet::empty(),
-                controls: PlotControls::empty(),
-            })
+            state: EditorState::Graphical(
+                p.initial_state
+            )
         }
     }
-
+    
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match &mut self.state {
             EditorState::Graphical(ge) => match msg {
@@ -443,6 +463,10 @@ impl Component for Editor {
                 }
                 Msg::ViewSwitch => {
                     self.state = EditorState::Source(ge.to_se())
+                }
+                Msg::SaveInUrl => {
+                    let location = web_sys::window().unwrap().location();
+                    location.set_hash(&ge.to_url_hash()).unwrap();
                 }
                 _otherwise => { }
             },
@@ -471,6 +495,7 @@ impl Component for Editor {
                     <span>{"EZ Petri"}</span>
                     <span class="menu-action"><a href="https://owenlynch.org/posts/2019-12-28-ez-petri">{"Help"}</a></span>
                     <span class="menu-action" onclick=|_| Msg::ViewSwitch>{"Toggle Source"}</span>
+                    <span class="menu-action" onclick=|_| Msg::SaveInUrl>{"Save in URL"}</span>
                 </div>
             { match &self.state {
                 EditorState::Graphical(ge) => ge.view(),

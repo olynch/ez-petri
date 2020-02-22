@@ -1,5 +1,5 @@
 [package]
-name = "petri-net-wasm"
+name = "ez-petri"
 version = "0.1.0"
 authors = ["Owen Lynch"]
 edition = "2018"
@@ -18,6 +18,11 @@ serde = { version = "1.0.103", features = ["derive"] }
 ndarray = { version = "0.13.0", features = ["serde"] }
 stdweb = "0.4.20"
 serde_json = "*"
+rmp-serde = "0.14.0"
+base64 = "0.11.0"
+url = "2.1.0"
+statrs = "0.12.0"
+rand = "0.7.3"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
@@ -29,6 +34,13 @@ console_error_panic_hook = { version = "0.1.6", optional = true }
 # compared to the default allocator's ~10K. It is slower than the default
 # allocator, however.
 wee_alloc = { version = "0.4.4", optional = true }
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "Window",
+  "Location"
+]
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
